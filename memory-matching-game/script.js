@@ -1,0 +1,5 @@
+const em=["😀","🎈","🍎","🚗","⭐","🐶","🍕","🌈"];let arr=[...em,...em].sort(()=>Math.random()-.5);let g=document.getElementById("game"),m=0,first=null,lock=false;
+arr.forEach((e,i)=>{let d=document.createElement("div");d.className="card hidden";d.textContent=e;d.onclick=()=>flip(d,e);g.appendChild(d);});
+function flip(el,e){if(lock||!el.classList.contains("hidden"))return;el.classList.remove("hidden");if(!first){first=el;return;}m++;document.getElementById("m").textContent=m;if(first.textContent===e&&first!==el){first=null;}else{lock=true;let a=first;setTimeout(()=>{a.classList.add("hidden");el.classList.add("hidden");first=null;lock=false;},700);}}
+const sc=document.getElementById("scores");[1,2,3].forEach(t=>{let s=0;let r=document.createElement("div");r.innerHTML=`${t}조 <button>-</button> <span>0</span> <button>+</button>`;let sp=r.querySelector("span");r.querySelectorAll("button")[0].onclick=()=>sp.textContent=--s;r.querySelectorAll("button")[1].onclick=()=>sp.textContent=++s;sc.appendChild(r);});
+function resetScores(){document.querySelectorAll("#scores span").forEach(x=>x.textContent=0)}
