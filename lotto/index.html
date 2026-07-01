@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <title>로또number추첨기</title>
+
+  <!-- 모바일 웹앱 설정 -->
+ <meta name="theme-color" content="#7C3AED">
+ <meta name="mobile-web-app-capable" content="yes">
+ <meta name="apple-mobile-web-app-capable" content="yes">
+ <meta name="apple-mobile-web-app-title" content="로또number추첨기">
+ <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+ <!-- 파비콘 / 앱 아이콘 -->
+ <link rel="icon" href="logo.png">
+ <link rel="apple-touch-icon" href="logo.png">
+
+
+
+
+  <!-- 구글 폰트: 숫자/영문용 Space Grotesk + 한글용 Noto Sans KR -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+  <style>
+    /* =========================================================
+       color 토큰 (디자인 조건에 맞춘 팔레트)
+       - darkbackground / neonpurple·핑크(버튼) / white(구슬,보드)
+       - number range별 5color (노랑/파랑/빨강/회color/초록)
+    ========================================================= */
+    :root {
+      --darkbackground: #0a0e17;
+      --darkbackground2: #12172a;
+      --neonpurple: #7c4dff;
+      --neon-pink: #ff4de1;
+      --white: #ffffff;
+      --textdark: #1c1f2b;
+      --textlight: #6b7280;
+
+      --color1_10: #ffd84d; /* 1~10 노란color */
+      --color11_20: #4da3ff; /* 11~20 파란color */
+      --color21_30: #ff5c5c; /* 21~30 빨간color */
+      --color31_40: #b0b4bd; /* 31~40 회color */
+      --color41_45: #4cd97b; /* 41~45 초록color */
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden; /* screen 전체를 하나의 무대처럼 사용 (스크롤바 없음) */
+      font-family: 'Noto Sans KR', sans-serif;
+      background: var(--darkbackground);
+    }
+
+    /* 세 개의 screen(무대)을 겹쳐놓고 opacity / pointer-events로 전환합니다 */
+    .screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.6s ease;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .screen.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* =========================================================
+       1단계 screen : 다크 모드 + 네온 그라데이션 버튼
+    ========================================================= */
+    #screen-btn {
+      background: radial-gradient(circle at 50% 30%, var(--darkbackground2), var(--darkbackground) 70%);
+      flex-direction: column;
+      gap: 28px;
+      z-index: 1;
+    }
+
+    .title-box { text-align: center; color: #fff; }
+    .title-box .top-label {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 13px;
+      letter-spacing: 0.35em;
+      color: #9ea4c2;
+      margin: 0 0 10px;
+    }
+    .title-box h1 {
+      font-size: 34px;
+      font-weight: 900;
+      margin: 0;
+      background: linear-gradient(90deg, #fff, #cdd3ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* 크고 누르기 쉬운 필(pill) 형태 + 글래스모피즘 + 네온 글로우 버튼 */
+    #draw-button {
+      position: relative;
+      padding: 22px 56px;
+      font-size: 20px;
+      font-weight: 700;
+      font-family: 'Noto Sans KR', sans-serif;
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 999px; /* 완전히 둥근 필 모양 */
+      cursor: pointer;
+      background: linear-gradient(120deg, var(--neonpurple), var(--neon-pink));
+      background-size: 200% 200%;
+      backdrop-filter: blur(6px);
+      box-shadow:
+        0 0 25px rgba(124,77,255,0.55),
+        0 0 55px rgba(255,77,225,0.35),
+        inset 0 0 18px rgba(255,255,255,0.25);
+      transition: transform 0.15s ease, box-shadow 0.3s ease, background-position 0.6s ease;
+      animation: btn_grad_move 4s ease-in-out infinite;
+      touch-action: manipulation; /* 모바일 탭 반응 속도 향상 */
+      min-width: 220px;
+    }
+    #draw-button:hover,
+    #draw-button:focus-visible {
+      transform: translateY(-2px) scale(1.03);
+      box-shadow:
+        0 0 35px rgba(124,77,255,0.75),
+        0 0 75px rgba(255,77,225,0.5),
+        inset 0 0 20px rgba(255,255,255,0.35);
+    }
+    #draw-button:active { transform: translateY(0) scale(0.97); }
+
+    @keyframes btn_grad_move {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+
+    .notice-text {
+      color: #7d84a8;
+      font-size: 13px;
+      margin: 0;
+      letter-spacing: 0.02em;
+    }
+
+    /* =========================================================
+       2단계 screen : white 배경 + 홀로그램 유리 구슬
+    ========================================================= */
+    #screen-bead {
+      background: var(--white);
+      z-index: 2;
+      cursor: pointer;
+    }
+
+    .bead-wrapper { display:flex; flex-direction:column; align-items:center; gap:26px; }
+
+    /* 투명 유리 구체 + 홀로그램 반사 (오로라 그라데이션 + 유리 하이라이트) */
+    .hologrambead {
+      width: 190px;
+      height: 190px;
+      border-radius: 50%;
+      position: relative;
+      background: radial-gradient(circle at 30% 25%,
+                    rgba(255,255,255,0.95) 0%,
+                    rgba(255,255,255,0.15) 18%,
+                    rgba(180,220,255,0.35) 40%,
+                    rgba(255,150,240,0.35) 60%,
+                    rgba(150,255,220,0.3) 80%,
+                    rgba(255,255,255,0.6) 100%);
+      box-shadow:
+        inset 0 0 25px rgba(255,255,255,0.9),
+        inset -18px -18px 40px rgba(255,255,255,0.5),
+        0 25px 45px rgba(0,0,0,0.12);
+      animation: beadrise 0.9s cubic-bezier(.34,1.56,.64,1) both,
+                 beadfloat 3.2s ease-in-out 0.9s infinite,
+                 beadcolorchange 6s linear infinite;
+      transform-origin: center;
+    }
+    /* 유리 표면 위의 밝은 하이라이트 반점 */
+    .hologrambead::after {
+      content: "";
+      position: absolute;
+      top: 18%; left: 22%;
+      width: 34%; height: 22%;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.85);
+      filter: blur(2px);
+    }
+
+    @keyframes beadrise {
+      0%   { opacity: 0; transform: translateY(60px) scale(0.4); }
+      60%  { opacity: 1; transform: translateY(-14px) scale(1.06); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes beadfloat { /* 등장 후 살짝 위아래로 부유하는 느낌 */
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    @keyframes beadcolorchange { /* 보는 angle에 따라 color이 변하는 홀로그램 느낌 */
+      0%   { filter: hue-rotate(0deg); }
+      100% { filter: hue-rotate(360deg); }
+    }
+
+    /* 구슬이 깨지듯 확산되며 사라질 때 붙는 class */
+    .hologrambead.breaking_down {
+      animation: bead_decompose 0.55s ease forwards;
+    }
+    @keyframes bead_decompose {
+      0%   { opacity: 1; transform: scale(1); filter: blur(0); }
+      100% { opacity: 0; transform: scale(2.4); filter: blur(14px); }
+    }
+
+    .bead-guide { color: var(--textlight); font-size: 14px; text-align: center; }
+    .bead-guide b { color: var(--textdark); }
+
+    /* =========================================================
+       3단계 screen : 전구 + 반원형 차트 보드 (결과 screen)
+    ========================================================= */
+    #screen-board {
+      background: var(--white);
+      z-index: 3;
+      flex-direction: column;
+      gap: 6px;
+      padding: 30px 16px;
+    }
+
+    .board-title { text-align:center; color: var(--textdark); margin-bottom: 6px; }
+    .board-title .top-label {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 12px;
+      letter-spacing: 0.3em;
+      color: #b7bbd6;
+    }
+    .board-title h2 { font-size: 22px; margin: 4px 0 0; font-weight: 900; }
+
+    /* 차트를 담는 상자: 가로 세로 ratio을 고정해서 반응형으로 만듭니다 */
+    .chart-box {
+      position: relative;
+      width: min(92vw, 420px);
+      aspect-ratio: 420 / 300;
+      margin-top: 4px;
+    }
+    .chart-box svg { width: 100%; height: 100%; display: block; overflow: visible; }
+
+    /* 반원 차트 선: stroke-dashoffset을 이용해 시계 방향으로 그려지는 효과 */
+    .chart-path {
+      fill: none;
+      stroke: url(#chart-gradient);
+      stroke-width: 10;
+      stroke-linecap: round;
+      stroke-dasharray: 560;
+      stroke-dashoffset: 560; /* 처음엔 선이 하나도 안 보임 */
+    }
+    #screen-board.show .chart-path {
+      animation: draw_chart 1.1s 0.25s ease forwards;
+    }
+    @keyframes draw_chart { to { stroke-dashoffset: 0; } }
+
+    /* 중앙 전구 일러스트 (플랫 디자인, 순수 CSS/SVG 도형) */
+    .bulb-group { transform-origin: 210px 205px; opacity: 0; }
+    #screen-board.show .bulb-group {
+      animation: bulb_appear 0.6s 0.9s cubic-bezier(.34,1.56,.64,1) forwards;
+    }
+    @keyframes bulb_appear {
+      0%   { opacity: 0; transform: scale(0.3); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+    .bulb-light {
+      transform-origin: 210px 205px;
+      opacity: 0;
+    }
+    #screen-board.show .bulb-light {
+      animation: bulb_flash 1.4s 1.1s ease-in-out infinite;
+    }
+    @keyframes bulb_flash {
+      0%, 100% { opacity: 0.15; }
+      50% { opacity: 0.55; }
+    }
+
+    /* number ball(인포그래픽 아이콘 역할) - 차트 위에 절대coordinates로 배치됩니다 */
+    .numberball {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 17px;
+      color: #fff;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.18), inset 0 -3px 6px rgba(0,0,0,0.15), inset 0 3px 6px rgba(255,255,255,0.5);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+    #screen-board.show .numberball {
+      animation: ball_bounce_appear 0.55s cubic-bezier(.34,1.56,.64,1) forwards;
+    }
+    .numberball:hover { transform: translate(-50%, -50%) scale(1.18) !important; z-index: 5; }
+    @keyframes ball_bounce_appear {
+      0%   { transform: translate(-50%, -50%) scale(0); }
+      70%  { transform: translate(-50%, -50%) scale(1.15); }
+      100% { transform: translate(-50%, -50%) scale(1); }
+    }
+
+    /* range별 color class */
+    .ballcolor_1_10  { background: radial-gradient(circle at 35% 30%, #fff2ba, var(--color1_10)); }
+    .ballcolor_11_20 { background: radial-gradient(circle at 35% 30%, #cfe6ff, var(--color11_20)); }
+    .ballcolor_21_30 { background: radial-gradient(circle at 35% 30%, #ffcccc, var(--color21_30)); }
+    .ballcolor_31_40 { background: radial-gradient(circle at 35% 30%, #eceef2, var(--color31_40)); color:#3a3d45; }
+    .ballcolor_41_45 { background: radial-gradient(circle at 35% 30%, #c9f7da, var(--color41_45)); }
+
+    /* speechbubble(툴팁): ball에 마우스를 올리면 range 정보를 보여줍니다 */
+    .speechbubble {
+      position: absolute;
+      bottom: 130%;
+      left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      background: var(--textdark);
+      color: #fff;
+      font-size: 11px;
+      line-height: 1.4;
+      padding: 6px 10px;
+      border-radius: 8px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+    .speechbubble::after {
+      content: "";
+      position: absolute;
+      top: 100%; left: 50%;
+      transform: translateX(-50%);
+      border: 5px solid transparent;
+      border-top-color: var(--textdark);
+    }
+    .numberball:hover .speechbubble,
+    .numberball:focus-visible .speechbubble {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* 결과 하단 버튼 영역 */
+    .board-button-area { display:flex; gap: 14px; margin-top: 26px; flex-wrap: wrap; justify-content:center; }
+    .board-button {
+      padding: 14px 28px;
+      border-radius: 999px;
+      font-size: 15px;
+      font-weight: 700;
+      font-family: 'Noto Sans KR', sans-serif;
+      cursor: pointer;
+      border: none;
+      touch-action: manipulation;
+    }
+    #redraw-button {
+      color: #fff;
+      background: linear-gradient(120deg, var(--neonpurple), var(--neon-pink));
+      box-shadow: 0 8px 20px rgba(124,77,255,0.35);
+    }
+    #first-button {
+      color: var(--textdark);
+      background: #f1f2f6;
+    }
+
+    /* 모바일 screen 대응 */
+    @media (max-width: 480px) {
+      .title-box h1 { font-size: 26px; }
+      #draw-button { padding: 20px 44px; font-size: 18px; width: 82%; }
+      .numberball { width: 38px; height: 38px; font-size: 15px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============ 1단계: 버튼 screen ============ -->
+  <!-- [수정] class="show-screen" (X) -> class="screen show" (O)
+       .screen 과 .show 는 서로 다른 두 개의 클래스이며, 공백으로 구분해서
+       둘 다 붙여줘야 CSS의 ".screen.show" 규칙이 정상 적용됩니다. -->
+  <section id="screen-btn" class="screen show">
+    <div class="title-box">
+      <p class="top-label">LUCKY DRAW</p>
+      <h1>로또number추첨기</h1>
+    </div>
+    <button id="draw-button" type="button">✨ 행운 number 뽑기</button>
+    <p class="notice-text">버튼을 누르면 6개의 number가 랜덤으로 추첨됩니다</p>
+  </section>
+
+  <!-- ============ 2단계: 홀로그램 구슬 screen ============ -->
+  <section id="screen-bead" class="screen">
+    <div class="bead-wrapper">
+      <div class="hologrambead" id="hologrambead"></div>
+      <!-- [수정] "number가 ball개됩니다" (X, 오타) -> "번호가 공개됩니다" (O) -->
+      <p class="bead-guide"><b>구슬을 클릭</b>하면 번호가 공개됩니다</p>
+    </div>
+  </section>
+
+  <!-- ============ 3단계: 전구 + 반원 차트 보드 screen ============ -->
+  <section id="screen-board" class="screen">
+    <div class="board-title">
+      <p class="top-label">YOUR NUMBERS</p>
+      <h2>오늘의 행운 number</h2>
+    </div>
+
+    <div class="chart-box">
+      <svg viewBox="0 0 420 300" id="board-svg">
+        <defs>
+          <!-- 반원 차트 선에 사용할 그라데이션 (네온 컬러와 통일감) -->
+          <linearGradient id="chart-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%"  stop-color="#7c4dff"/>
+            <stop offset="50%" stop-color="#4da3ff"/>
+            <stop offset="100%" stop-color="#ff4de1"/>
+          </linearGradient>
+        </defs>
+
+        <!-- 반원형 프로세스 차트 선 (왼쪽 -> 위 -> 오른쪽, 시계 방향으로 그려짐) -->
+        <path class="chart-path" d="M 50,205 A 160,160 0 0 1 370,205"></path>
+
+        <!-- 전구에서 퍼지는 은은한 빛 (플랫한 원형 글로우) -->
+        <circle class="bulb-light" cx="210" cy="205" r="70" fill="#ffe9a8"></circle>
+
+        <!-- 중앙 전구 일러스트 (플랫 디자인 아이콘) -->
+        <g class="bulb-group">
+          <!-- 전구 알(둥근 부분) -->
+          <path d="M210,150 a38,38 0 1 1 -14,73 l0,17 l28,0 l0,-17 a38,38 0 0 1 -14,-73 z"
+                fill="#ffd84d" stroke="#1c1f2b" stroke-width="4" stroke-linejoin="round"/>
+          <!-- 전구 나사 부분 -->
+          <rect x="196" y="240" width="28" height="8" rx="2" fill="#1c1f2b"/>
+          <rect x="199" y="250" width="22" height="7" rx="2" fill="#1c1f2b"/>
+          <!-- 전구 안의 필라멘트 -->
+          <path d="M203,178 l7,14 l-6,3 l7,13" fill="none" stroke="#1c1f2b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+      </svg>
+
+      <!-- number ball(인포그래픽 아이콘)들은 JS에서 차트 위 coordinates에 맞춰 동적으로 생성됩니다 -->
+      <div id="ballcontainer"></div>
+    </div>
+
+    <div class="board-button-area">
+      <button id="redraw-button" class="board-button" type="button">🔁 다시 뽑기</button>
+      <button id="first-button" class="board-button" type="button">처음으로</button>
+    </div>
+  </section>
+
+  <script>
+    // =========================================================
+    // screen(무대) 전환을 담당하는 요소들을 미리 찾아둡니다.
+    // =========================================================
+    var screenbutton = document.getElementById('screen-btn');
+    var screenbead = document.getElementById('screen-bead');
+    var screenboard = document.getElementById('screen-board');
+    var hologrambead = document.getElementById('hologrambead');
+    var ballcontainer = document.getElementById('ballcontainer');
+
+    // -----------------------------------------------------------
+    // 1) 1~45 중 중복 없이 6개를 뽑아 오름차순으로 정렬하는 함수
+    // -----------------------------------------------------------
+    function lottonumbergenerator() {
+      var totalnumbers = [];
+      for (var i = 1; i <= 45; i++) {
+        totalnumbers.push(i); // 1부터 45까지 숫자를 배열에 채워넣기
+      }
+
+      var drawnnumbers = [];
+      for (var j = 0; j < 6; j++) {
+        // 남아있는 숫자 중 하나를 랜덤한 인덱스로 골라서 뽑고 배열에서 제거 (중복 방지)
+        var randomindex = Math.floor(Math.random() * totalnumbers.length);
+        drawnnumbers.push(totalnumbers[randomindex]);
+        totalnumbers.splice(randomindex, 1);
+      }
+
+      // 오름차순으로 정렬해서 반환
+      drawnnumbers.sort(function (a, b) { return a - b; });
+      return drawnnumbers;
+    }
+
+    // -----------------------------------------------------------
+    // 2) 숫자 범위에 따라 color class 이름과 range description을 돌려주는 함수
+    // -----------------------------------------------------------
+    function numberrangeinfo(number) {
+      if (number <= 10) return { class: 'ballcolor_1_10',  description: '1~10 range · 노란color' };
+      if (number <= 20) return { class: 'ballcolor_11_20', description: '11~20 range · 파란color' };
+      if (number <= 30) return { class: 'ballcolor_21_30', description: '21~30 range · 빨간color' };
+      if (number <= 40) return { class: 'ballcolor_31_40', description: '31~40 range · 회color' };
+      return { class: 'ballcolor_41_45', description: '41~45 range · 초록color' };
+    }
+
+    // -----------------------------------------------------------
+    // 3) 반원 차트 위, 6개의 ball을 배치할 coordinates를 계산하는 함수
+    //    (SVG viewBox 420x300 기준, center 210,205 / radius 160)
+    // -----------------------------------------------------------
+    function ballplacementcoordinateslist(count) {
+      var centerX = 210, centerY = 205, radius = 160;
+      var startangle = 172, endangle = 8; // 양쪽 끝은 살짝 안쪽으로 여유를 둠
+      var coordinateslist = [];
+
+      for (var i = 0; i < count; i++) {
+        var ratio = count === 1 ? 0 : i / (count - 1);
+        var angle = startangle - (startangle - endangle) * ratio; // startangle에서 endangle까지 균등 분배
+        var radian = angle * Math.PI / 180;
+        var x = centerX + radius * Math.cos(radian);
+        var y = centerY - radius * Math.sin(radian); // 위쪽 반원이므로 y는 위로 갈수록 작아짐
+        coordinateslist.push({ x: x, y: y });
+      }
+      return coordinateslist;
+    }
+
+    // -----------------------------------------------------------
+    // 4) 뽑힌 number들을 보드 screen 위에 ball 모양으로 그려주는 함수
+    // -----------------------------------------------------------
+    function drawnumberonboard(numberarray) {
+      ballcontainer.innerHTML = ''; // 이전 결과 지우기
+      var coordinateslist = ballplacementcoordinateslist(numberarray.length);
+
+      numberarray.forEach(function (number, index) {
+        var range = numberrangeinfo(number);
+        var coordinates = coordinateslist[index];
+
+        var ball = document.createElement('div');
+        ball.className = 'numberball ' + range.class;
+        // % 단위로 위치를 지정해야 screen 크기가 바뀌어도(반응형) 위치가 유지됩니다
+        ball.style.left = (coordinates.x / 420 * 100) + '%';
+        ball.style.top = (coordinates.y / 300 * 100) + '%';
+        // ball이 순서대로 톡톡 튀어나오는 느낌을 주기 위한 시간차(딜레이)
+        ball.style.animationDelay = (1.2 + index * 0.12) + 's';
+        ball.tabIndex = 0; // 키보드로도 speechbubble에 접근 가능하게
+
+        var displaynumber = document.createElement('span');
+        displaynumber.textContent = number;
+        ball.appendChild(displaynumber);
+
+        var speechbubble = document.createElement('span');
+        speechbubble.className = 'speechbubble';
+        speechbubble.textContent = number + ' · ' + range.description;
+        ball.appendChild(speechbubble);
+
+        ballcontainer.appendChild(ball);
+      });
+    }
+
+    // -----------------------------------------------------------
+    // 5) screen 전환 함수들
+    // -----------------------------------------------------------
+    function openbeadscreen() {
+      screenbutton.classList.remove('show');
+      screenbead.classList.add('show');
+      // 구슬 등장 애니메이션을 처음부터 다시 보여주기 위해 class를 리셋
+      hologrambead.classList.remove('breaking_down');
+      void hologrambead.offsetWidth; // 리플로우 강제 발생시켜 애니메이션 재시작
+      hologrambead.style.animation = 'none';
+      requestAnimationFrame(function () {
+        hologrambead.style.animation = '';
+      });
+    }
+
+    function openboardscreen() {
+      var numberarray = lottonumbergenerator();
+
+      screenbead.classList.remove('show');
+      screenboard.classList.remove('show');
+      // 차트 그리기 애니메이션이 매번 새로 실행되도록 class를 잠깐 뺐다가 다시 붙입니다
+      void screenboard.offsetWidth;
+      screenboard.classList.add('show');
+
+      drawnumberonboard(numberarray);
+    }
+
+    function returntoinitialscreen() {
+      screenboard.classList.remove('show');
+      screenbead.classList.remove('show');
+      screenbutton.classList.add('show');
+    }
+
+    // -----------------------------------------------------------
+    // 6) 이벤트 연결
+    // -----------------------------------------------------------
+
+    // [1단계 -> 2단계] 추첨 버튼 클릭 시 홀로그램 구슬 screen으로 전환
+    document.getElementById('draw-button').addEventListener('click', openbeadscreen);
+
+    // [2단계 -> 3단계] 구슬을 클릭하면, 살짝 분해되는 효과 후 결과 보드로 전환
+    screenbead.addEventListener('click', function () {
+      hologrambead.classList.add('breaking_down');
+      setTimeout(openboardscreen, 480); // 분해 애니메이션이 끝난 뒤 screen 전환
+    });
+
+    // [2단계 -> 3단계] 스크롤(휠)을 내려도 동일하게 결과 보드로 전환되게 함
+    var switchedtoscroll = false;
+    screenbead.addEventListener('wheel', function (e) {
+      if (switchedtoscroll) return;
+      if (e.deltaY > 0) {
+        switchedtoscroll = true;
+        hologrambead.classList.add('breaking_down');
+        setTimeout(function () { openboardscreen(); switchedtoscroll = false; }, 480);
+      }
+    });
+
+    // [3단계] 다시 뽑기 버튼: 보드 screen을 유지한 채 number만 새로 뽑기
+    document.getElementById('redraw-button').addEventListener('click', function (e) {
+      e.stopPropagation();
+      openboardscreen();
+    });
+
+    // [3단계 -> 1단계] 처음으로 버튼
+    document.getElementById('first-button').addEventListener('click', function (e) {
+      e.stopPropagation();
+      returntoinitialscreen();
+    });
+  </script>
+</body>
+</html>
