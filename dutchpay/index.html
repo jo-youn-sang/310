@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<base target="_top">
+<title>페이쉐어</title>
+
+<!-- 모바일 웹앱 설정 -->
+<meta name="theme-color" content="#7C3AED">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="페이쉐어">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+<!-- 파비콘 / 앱 아이콘 -->
+<link rel="icon" href="logo.png">
+<link rel="apple-touch-icon" href="logo.png">
+
+<!-- 한글이 예쁘게 보이는 무료 웹폰트(Pretendard)를 불러옵니다. -->
+<link rel="stylesheet" as="style" crossorigin
+  href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+
+<style>
+  /* =====================================================================
+     디자인 토큰 (색상 / 간격 / 그림자 등 앱 전체에서 재사용하는 값)
+     - 배경 : 어두운 차콜톤
+     - 포인트 : 보라 → 시안 그라데이션 (원형 영역 전용)
+     - 강조 버튼 : 밝은 코랄 오렌지 (어두운 배경 위에서 튀어 보이도록)
+  ===================================================================== */
+  :root{
+    --bg-0:#0e1015;            /* 앱 전체 배경(가장 어두운 색) */
+    --bg-1:#171a22;            /* 카드 배경 */
+    --bg-2:#1f2330;            /* 카드보다 한 단계 밝은 표면(입력창 등) */
+    --line:#2b2f3d;            /* 얇은 테두리 색 */
+    --text-0:#f5f6fa;          /* 기본 텍스트(밝은 색) */
+    --text-1:#a7acbd;          /* 보조 텍스트(회색) */
+    --accent-a:#7c5cfc;        /* 그라데이션 시작색(보라) */
+    --accent-b:#22d3ee;        /* 그라데이션 끝색(시안) */
+    --cta:#ff6b4a;             /* 메인 강조 버튼 색(코랄) */
+    --cta-dark:#c9482c;        /* 강조 버튼 그림자/누름 색 */
+    --danger:#ff5470;          /* 경고(빨강) */
+    --radius-card:24px;
+    --radius-pill:999px;       /* 알약(캡슐) 모양을 위한 반지름 */
+    --font: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    margin:0; padding:0;
+    background:
+      radial-gradient(circle at 50% -10%, rgba(124,92,252,0.25), transparent 45%),
+      var(--bg-0);
+    color:var(--text-0);
+    font-family:var(--font);
+    -webkit-tap-highlight-color:transparent; /* 모바일에서 터치 시 회색 번쩍임 제거 */
+  }
+
+  /* 전체 가운데 정렬 + 한 손 조작을 위한 세로 폭 제한 */
+  .app{
+    max-width:460px;
+    margin:0 auto;
+    padding:28px 18px 60px;
+    min-height:100vh;
+  }
+
+  header{
+    text-align:center;
+    margin-bottom:22px;
+  }
+  header .logo{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:56px; height:56px; border-radius:50%;
+    background:linear-gradient(135deg,var(--accent-a),var(--accent-b));
+    font-size:26px; margin-bottom:10px;
+    box-shadow:0 10px 24px -6px rgba(124,92,252,0.55);
+  }
+  header h1{ margin:0; font-size:22px; letter-spacing:0.5px; }
+  header p{ margin:4px 0 0; color:var(--text-1); font-size:13px; }
+
+  /* -------------------- 카드 공통 스타일 -------------------- */
+  .card{
+    background:var(--bg-1);
+    border:1px solid var(--line);
+    border-radius:var(--radius-card);
+    padding:20px;
+    margin-bottom:16px;
+    /* 등장 애니메이션 초기 상태: 아래에 숨어서 투명하게 대기 */
+    opacity:0;
+    transform:translateY(18px);
+    transition:opacity .5s cubic-bezier(.16,1,.3,1), transform .5s cubic-bezier(.16,1,.3,1);
+  }
+  .card.show{ opacity:1; transform:translateY(0); } /* JS가 이 클래스를 순차적으로 붙여줍니다 */
+
+  .card-title{
+    display:flex; align-items:center; gap:8px;
+    font-size:14px; font-weight:700; color:var(--text-1);
+    margin-bottom:12px; text-transform:uppercase; letter-spacing:0.4px;
+  }
+  .card-title .dot{
+    width:8px; height:8px; border-radius:50%;
+    background:linear-gradient(135deg,var(--accent-a),var(--accent-b));
+  }
+
+  /* -------------------- 총 금액 입력 -------------------- */
+  .amount-input-wrap{
+    display:flex; align-items:baseline; gap:6px;
+    background:var(--bg-2); border:1px solid var(--line);
+    border-radius:18px; padding:16px 18px;
+  }
+  #totalAmountInput{
+    flex:1; min-width:0;
+    background:transparent; border:none; outline:none;
+    color:var(--text-0); font-size:32px; font-weight:800;
+    font-family:var(--font);
+    caret-color:var(--accent-b);
+  }
+  #totalAmountInput::placeholder{ color:#4c5164; }
+  .unit{ font-size:18px; color:var(--text-1); font-weight:600; }
+
+  /* -------------------- 인원수 선택 (원형 다이얼 = 시그니처 요소) -------------------- */
+  .people-row{
+    display:flex; align-items:center; justify-content:center; gap:18px;
+  }
+  .step-btn{
+    width:52px; height:52px; border-radius:50%;
+    border:none; cursor:pointer;
+    background:var(--bg-2); color:var(--text-0);
+    font-size:24px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+    position:relative; overflow:hidden;
+    /* 롱 섀도우: 버튼 뒤로 대각선 방향 그림자를 길게 깔아 입체감을 줍니다 */
+    box-shadow:
+      2px 3px 0 var(--line),
+      4px 6px 10px -2px rgba(0,0,0,0.5);
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .step-btn:hover{
+    transform:translateY(-2px);
+    box-shadow:
+      3px 5px 0 var(--line),
+      8px 14px 20px -4px rgba(0,0,0,0.6); /* 호버 시 그림자를 더 길고 흐리게 */
+  }
+  .step-btn:active{
+    transform:scale(0.96) translateY(0); /* 누르면 2~3% 축소되는 물리적 피드백 */
+    box-shadow:1px 2px 0 var(--line), 2px 3px 6px -2px rgba(0,0,0,0.5);
+  }
+  .step-btn:disabled{ opacity:0.35; cursor:not-allowed; transform:none; }
+
+  /* 인원수를 보여주는 원형 배지: 왼쪽 원형에만 그라데이션을 적용해 시선을 집중시킵니다 */
+  .people-dial{
+    width:104px; height:104px; border-radius:50%;
+    background:linear-gradient(135deg,var(--accent-a),var(--accent-b));
+    display:flex; align-items:center; justify-content:center; flex-direction:column;
+    box-shadow:0 14px 30px -8px rgba(124,92,252,0.6);
+    transition:transform .18s cubic-bezier(.34,1.56,.64,1); /* 살짝 튕기는 느낌 */
+  }
+  .people-dial.pulse{ transform:scale(1.08); }
+  .people-dial b{ font-size:34px; line-height:1; color:#fff; }
+  .people-dial span{ font-size:11px; color:rgba(255,255,255,0.85); margin-top:2px; }
+
+  .people-direct{
+    margin-top:14px; text-align:center;
+  }
+  .people-direct input{
+    width:70px; text-align:center; background:var(--bg-2);
+    border:1px solid var(--line); border-radius:var(--radius-pill);
+    color:var(--text-0); font-size:14px; padding:8px 10px; font-family:var(--font);
+    outline:none;
+  }
+  .people-direct label{ font-size:12px; color:var(--text-1); display:block; margin-bottom:6px; }
+  .max-hint{ text-align:center; font-size:11px; color:var(--text-1); margin-top:8px; }
+
+  /* -------------------- 반올림 방식 선택 (세그먼트 토글) -------------------- */
+  .segment{
+    display:flex; background:var(--bg-2); border-radius:var(--radius-pill);
+    padding:4px; border:1px solid var(--line);
+  }
+  .segment button{
+    flex:1; border:none; background:transparent; color:var(--text-1);
+    padding:10px 0; border-radius:var(--radius-pill); font-size:13px; font-weight:700;
+    cursor:pointer; font-family:var(--font); transition:all .2s ease;
+  }
+  .segment button.active{
+    background:linear-gradient(135deg,var(--accent-a),var(--accent-b));
+    color:#fff; box-shadow:0 6px 14px -4px rgba(124,92,252,0.6);
+  }
+
+  /* -------------------- 결과 카드 -------------------- */
+  .result-card{
+    text-align:center;
+    background:linear-gradient(180deg, var(--bg-1), var(--bg-2));
+  }
+  .result-label{ font-size:13px; color:var(--text-1); margin-bottom:6px; }
+  .result-amount{
+    font-size:42px; font-weight:800; letter-spacing:-0.5px;
+    background:linear-gradient(135deg,#fff,#cfe3ff);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .result-sub{ font-size:12px; color:var(--text-1); margin-top:6px; min-height:16px; }
+  .result-sub.warn{ color:var(--danger); font-weight:700; }
+
+  /* -------------------- 알약(캡슐) 모양 버튼 : 아이콘+텍스트 -------------------- */
+  .pill-btn{
+    width:100%; margin-top:16px;
+    display:flex; align-items:center; gap:12px;
+    border:none; cursor:pointer; text-align:left;
+    background:var(--cta); color:#fff;
+    border-radius:var(--radius-pill);
+    padding:8px 8px 8px 8px;
+    font-family:var(--font);
+    position:relative; overflow:hidden;
+    box-shadow:3px 4px 0 var(--cta-dark), 6px 10px 18px -6px rgba(255,107,74,0.6);
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .pill-btn .pill-icon{
+    width:40px; height:40px; border-radius:50%; flex:none;
+    background:rgba(255,255,255,0.25);
+    display:flex; align-items:center; justify-content:center; font-size:18px;
+    transition:background .25s ease;
+  }
+  .pill-btn .pill-text{ font-weight:800; font-size:14px; letter-spacing:0.3px; }
+  /* 호버 시 원형 아이콘의 그라데이션 느낌이 우측 배경으로 번지는 효과 */
+  .pill-btn:hover .pill-icon{ background:rgba(255,255,255,0.4); }
+  .pill-btn:hover{
+    transform:translateY(-2px);
+    box-shadow:4px 6px 0 var(--cta-dark), 10px 18px 26px -6px rgba(255,107,74,0.7);
+  }
+  .pill-btn:active{
+    transform:scale(0.97);
+    box-shadow:1px 2px 0 var(--cta-dark), 3px 5px 10px -4px rgba(255,107,74,0.6);
+  }
+  .pill-btn.secondary{
+    background:var(--bg-2); box-shadow:3px 4px 0 var(--line), 6px 10px 18px -6px rgba(0,0,0,0.5);
+  }
+  .pill-btn.secondary .pill-icon{ background:linear-gradient(135deg,var(--accent-a),var(--accent-b)); }
+  .pill-btn.secondary:hover{ box-shadow:4px 6px 0 var(--line), 10px 18px 26px -6px rgba(0,0,0,0.6); }
+  .pill-btn.secondary:active{ box-shadow:1px 2px 0 var(--line), 3px 5px 10px -4px rgba(0,0,0,0.5); }
+
+  /* 리플(파동) 효과용 span - JS가 클릭 위치에 생성합니다 */
+  .ripple{
+    position:absolute; border-radius:50%;
+    background:rgba(255,255,255,0.5);
+    transform:scale(0); pointer-events:none;
+    animation:ripple-anim .55s ease-out forwards;
+  }
+  @keyframes ripple-anim{
+    to{ transform:scale(3.2); opacity:0; }
+  }
+
+  /* -------------------- 개인별 추가 금액 목록 -------------------- */
+  .extra-row{
+    display:flex; gap:8px; align-items:center; margin-bottom:10px;
+    animation:row-in .35s cubic-bezier(.16,1,.3,1); /* 새 행이 미끄러지듯 등장 */
+  }
+  @keyframes row-in{
+    from{ opacity:0; transform:translateX(-10px); }
+    to{ opacity:1; transform:translateX(0); }
+  }
+  .extra-row input[type=text]{
+    width:78px; background:var(--bg-2); border:1px solid var(--line);
+    border-radius:var(--radius-pill); color:var(--text-0);
+    padding:10px 14px; font-size:13px; font-family:var(--font); outline:none;
+  }
+  .extra-row input[type=tel]{
+    flex:1; min-width:0; background:var(--bg-2); border:1px solid var(--line);
+    border-radius:var(--radius-pill); color:var(--text-0);
+    padding:10px 14px; font-size:14px; font-weight:700; font-family:var(--font); outline:none;
+    text-align:right;
+  }
+  .extra-remove{
+    flex:none; width:36px; height:36px; border-radius:50%; border:none;
+    background:rgba(255,84,112,0.15); color:var(--danger); font-size:16px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:transform .12s ease;
+  }
+  .extra-remove:active{ transform:scale(0.9); }
+
+  .extra-empty{ font-size:12px; color:var(--text-1); text-align:center; padding:8px 0; }
+
+  .person-final-list{ margin-top:14px; border-top:1px dashed var(--line); padding-top:12px; }
+  .person-final{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:8px 0; font-size:13px;
+  }
+  .person-final .name{ color:var(--text-1); font-weight:600; }
+  .person-final .amount{ font-weight:800; }
+
+  /* 화면 하단 안내 토스트 (복사 완료 메시지 등) */
+  .toast{
+    position:fixed; left:50%; bottom:28px; transform:translate(-50%, 20px);
+    background:#fff; color:#111; padding:12px 20px; border-radius:var(--radius-pill);
+    font-size:13px; font-weight:700; box-shadow:0 12px 26px -6px rgba(0,0,0,0.5);
+    opacity:0; pointer-events:none; transition:all .25s cubic-bezier(.16,1,.3,1);
+    z-index:50;
+  }
+  .toast.show{ opacity:1; transform:translate(-50%, 0); }
+
+  /* 인원수 최대치 도달 시 살짝 흔들리는 경고 애니메이션 */
+  .shake{ animation:shake-anim .35s ease; }
+  @keyframes shake-anim{
+    0%,100%{ transform:translateX(0); }
+    25%{ transform:translateX(-4px); }
+    75%{ transform:translateX(4px); }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <header>
+    <div class="logo">💸</div>
+    <h1>페이쉐어 <span style="color:var(--text-1); font-weight:400;">PayShare</span></h1>
+    <p>더치페이, 계산은 우리가 할게요</p>
+  </header>
+
+  <!-- ① 총 결제 금액 입력 카드 -->
+  <section class="card" id="card-total">
+    <div class="card-title"><span class="dot"></span>총 결제 금액</div>
+    <div class="amount-input-wrap">
+      <!-- type="tel" + inputmode="numeric" 조합으로 모바일에서 숫자 키패드가 자동으로 뜹니다 -->
+      <input id="totalAmountInput" type="tel" inputmode="numeric"
+             placeholder="0" autocomplete="off" />
+      <span class="unit">원</span>
+    </div>
+  </section>
+
+  <!-- ② 인원수 선택 카드 -->
+  <section class="card" id="card-people">
+    <div class="card-title"><span class="dot"></span>인원수</div>
+    <div class="people-row">
+      <button class="step-btn" id="minusButton" aria-label="인원 감소">−</button>
+      <div class="people-dial" id="peopleDial">
+        <b id="peopleCountText">1</b>
+        <span>명</span>
+      </div>
+      <button class="step-btn" id="plusButton" aria-label="인원 증가">+</button>
+    </div>
+    <div class="people-direct">
+      <label>직접 입력</label>
+      <input id="peopleDirectInput" type="tel" inputmode="numeric" value="1" />
+    </div>
+    <div class="max-hint" id="maxHintText"></div>
+  </section>
+
+  <!-- ③ 원 단위 처리 방식 카드 -->
+  <section class="card" id="card-round">
+    <div class="card-title"><span class="dot"></span>원 단위 처리</div>
+    <div class="segment" id="roundSegment">
+      <button data-mode="round" class="active">반올림</button>
+      <button data-mode="ceil">올림</button>
+      <button data-mode="floor">버림</button>
+    </div>
+  </section>
+
+  <!-- ④ 결과 카드 -->
+  <section class="card result-card" id="card-result">
+    <div class="result-label">1인당 기본 금액</div>
+    <div class="result-amount"><span id="resultAmountEl">0</span>원</div>
+    <div class="result-sub" id="resultSubEl"></div>
+
+    <button class="pill-btn" id="copyButton">
+      <span class="pill-icon">📋</span>
+      <span class="pill-text">1인당 금액 복사하기</span>
+    </button>
+  </section>
+
+  <!-- ⑤ 개인별 추가 금액 카드 -->
+  <section class="card" id="card-extra">
+    <div class="card-title"><span class="dot"></span>개인별 추가 금액</div>
+
+    <div id="extraListEl"></div>
+    <div class="extra-empty" id="extraEmptyText">예: 이름 "민수", 금액 "15000" (술값 추가 등)</div>
+
+    <button class="pill-btn secondary" id="addExtraButton">
+      <span class="pill-icon">＋</span>
+      <span class="pill-text">추가 금액 항목 넣기</span>
+    </button>
+
+    <div class="person-final-list" id="personFinalListEl" style="display:none;">
+      <button class="pill-btn secondary" id="copyAllButton" style="margin-top:0; margin-bottom:12px;">
+        <span class="pill-icon">🧾</span>
+        <span class="pill-text">전체 정산 결과 복사하기</span>
+      </button>
+      <div id="personFinalItemsEl"></div>
+    </div>
+  </section>
+
+</div>
+
+<div class="toast" id="toastEl"></div>
+
+<script>
+  // =====================================================================
+  //  PayShare - 프론트엔드 로직 (브라우저에서 전부 계산합니다)
+  // =====================================================================
+
+  // ---------------------- 기본 설정값 ----------------------
+  var MAX_PEOPLE_COUNT = 30; // 인원수 선택 최대 제한 (필요하면 이 숫자만 바꾸면 됩니다)
+
+  // ---------------------- 앱 상태(state) ----------------------
+  var totalAmount = 0;        // 총 결제 금액 (숫자)
+  var peopleCount = 1;        // 나눌 인원수 (숫자, 최소 1)
+  var roundMode = 'round';    // 'round'(반올림) | 'ceil'(올림) | 'floor'(버림)
+  var extraList = [];         // [{ id, name, amount }, ...]
+  var nextRowId = 1;          // 추가 금액 행에 부여할 고유 번호
+
+  // ---------------------- 화면 요소 가져오기 ----------------------
+  var totalAmountInput = document.getElementById('totalAmountInput');
+  var peopleCountText = document.getElementById('peopleCountText');
+  var peopleDirectInput = document.getElementById('peopleDirectInput');
+  var peopleDial = document.getElementById('peopleDial');
+  var minusButton = document.getElementById('minusButton');
+  var plusButton = document.getElementById('plusButton');
+  var maxHintText = document.getElementById('maxHintText');
+  var resultAmountEl = document.getElementById('resultAmountEl');
+  var resultSubEl = document.getElementById('resultSubEl');
+  var copyButton = document.getElementById('copyButton');
+  var copyAllButton = document.getElementById('copyAllButton');
+  var extraListEl = document.getElementById('extraListEl');
+  var extraEmptyText = document.getElementById('extraEmptyText');
+  var addExtraButton = document.getElementById('addExtraButton');
+  var personFinalListEl = document.getElementById('personFinalListEl');
+  var personFinalItemsEl = document.getElementById('personFinalItemsEl');
+  var toastEl = document.getElementById('toastEl');
+
+  // ---------------------- 숫자 포맷 유틸 함수 ----------------------
+
+  // 숫자 → "1,234" 형태의 천 단위 콤마 문자열로 변환
+  function formatComma(number) {
+    return Math.round(number).toLocaleString('ko-KR');
+  }
+
+  // 사용자가 입력한 문자열에서 숫자만 뽑아내기 (음수 기호, 문자, 소수점 전부 제거)
+  function extractDigits(text) {
+    var digitsOnly = String(text).replace(/[^0-9]/g, ''); // 숫자(0-9) 이외 전부 삭제 → 음수 입력 원천 차단
+    if (digitsOnly === '') return 0;
+    return parseInt(digitsOnly, 10);
+  }
+
+  // 선택된 반올림 방식에 맞춰 원 단위를 처리하는 함수 (소수점 없이 정수로 반환)
+  function applyRoundMode(value) {
+    if (roundMode === 'ceil') return Math.ceil(value);
+    if (roundMode === 'floor') return Math.floor(value);
+    return Math.round(value); // 기본값: 반올림
+  }
+
+  // ---------------------- ① 총 금액 입력 처리 ----------------------
+  totalAmountInput.addEventListener('input', function () {
+    totalAmount = extractDigits(totalAmountInput.value); // 숫자만 남기고 음수 방지
+    totalAmountInput.value = totalAmount === 0 ? '' : formatComma(totalAmount); // 콤마 자동 표시
+    recalculate();
+  });
+
+  // ---------------------- ② 인원수 선택 처리 ----------------------
+
+  // 인원수를 실제로 반영하고 화면을 갱신하는 공통 함수
+  function setPeopleCount(newCount) {
+    // 최소 1명, 최대 "MAX_PEOPLE_COUNT" 범위를 벗어나지 않도록 보정
+    if (newCount < 1) newCount = 1;
+    if (newCount > MAX_PEOPLE_COUNT) {
+      newCount = MAX_PEOPLE_COUNT;
+      peopleDial.classList.add('shake'); // 최대치 도달 시 살짝 흔들어서 알려줌
+      setTimeout(function () { peopleDial.classList.remove('shake'); }, 350);
+    }
+    peopleCount = newCount;
+    peopleCountText.textContent = peopleCount;
+    peopleDirectInput.value = peopleCount;
+
+    // +/- 버튼 비활성화 처리 (최소/최대 도달 시)
+    minusButton.disabled = (peopleCount <= 1);
+    plusButton.disabled = (peopleCount >= MAX_PEOPLE_COUNT);
+
+    // 원형 배지가 살짝 튕기는 마이크로 애니메이션
+    peopleDial.classList.add('pulse');
+    setTimeout(function () { peopleDial.classList.remove('pulse'); }, 180);
+
+    recalculate();
+  }
+
+  minusButton.addEventListener('click', function () { setPeopleCount(peopleCount - 1); });
+  plusButton.addEventListener('click', function () { setPeopleCount(peopleCount + 1); });
+
+  peopleDirectInput.addEventListener('input', function () {
+    var inputValue = extractDigits(peopleDirectInput.value);
+    if (inputValue === 0) return; // 입력 중(빈 값)일 때는 강제로 바꾸지 않음
+    setPeopleCount(inputValue);
+  });
+
+  maxHintText.textContent = '최대 ' + MAX_PEOPLE_COUNT + '명까지 선택할 수 있어요';
+
+  // ---------------------- ③ 원 단위 처리 방식(세그먼트) ----------------------
+  var segmentButtons = document.querySelectorAll('#roundSegment button');
+  segmentButtons.forEach(function (button) {
+    button.addEventListener('click', function () {
+      segmentButtons.forEach(function (b) { b.classList.remove('active'); });
+      button.classList.add('active');
+      roundMode = button.getAttribute('data-mode');
+      recalculate();
+    });
+  });
+
+  // ---------------------- 핵심 계산 로직 ----------------------
+
+  // 화면 숫자를 이전 값에서 새 값까지 부드럽게 올려주는 카운트업 애니메이션
+  function animateCountUp(element, fromValue, toValue) {
+    var duration = 400; // ms
+    var startTime = null;
+
+    function frame(currentTime) {
+      if (!startTime) startTime = currentTime;
+      var progress = Math.min((currentTime - startTime) / duration, 1);
+      var easedProgress = 1 - Math.pow(1 - progress, 3); // ease-out 곡선
+      var currentValue = fromValue + (toValue - fromValue) * easedProgress;
+      element.textContent = formatComma(currentValue);
+      if (progress < 1) requestAnimationFrame(frame);
+      else element.textContent = formatComma(toValue);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  var previousResultValue = 0; // 카운트업 애니메이션의 시작점을 기억해두는 변수
+
+  // 실시간 재계산: 입력값이 바뀔 때마다 호출됩니다
+  function recalculate() {
+    // 0원으로 나누기 방지: 인원수는 항상 1 이상으로 보정되어 있으므로 안전합니다.
+    var extraSum = extraList.reduce(function (sum, item) {
+      return sum + item.amount;
+    }, 0);
+
+    // 추가 금액을 뺀 "다 같이 나눌 금액". 음수가 되지 않도록 0으로 방지합니다.
+    var amountToSplit = Math.max(totalAmount - extraSum, 0);
+    var baseSharePerPerson = applyRoundMode(amountToSplit / peopleCount);
+
+    // 결과 숫자 카운트업 애니메이션으로 표시
+    animateCountUp(resultAmountEl, previousResultValue, baseSharePerPerson);
+    previousResultValue = baseSharePerPerson;
+
+    // 경고 문구: 추가 금액 합계가 총 금액보다 큰 경우 안내
+    if (totalAmount > 0 && extraSum > totalAmount) {
+      resultSubEl.textContent = '⚠ 추가 금액 합계가 총 금액보다 많아요';
+      resultSubEl.classList.add('warn');
+    } else {
+      resultSubEl.textContent = peopleCount + '명이서 ' + formatComma(amountToSplit) + '원을 나눠요';
+      resultSubEl.classList.remove('warn');
+    }
+
+    // 개인별 최종 금액(기본금액 + 본인의 추가금액) 다시 그리기
+    renderPersonFinalResults(baseSharePerPerson);
+  }
+
+  // ---------------------- ⑤ 개인별 추가 금액 목록 ----------------------
+
+  // 추가 금액 행 한 줄을 화면에 그리는 함수
+  function renderExtraRows() {
+    extraListEl.innerHTML = '';
+    extraEmptyText.style.display = extraList.length === 0 ? 'block' : 'none';
+
+    extraList.forEach(function (item) {
+      var row = document.createElement('div');
+      row.className = 'extra-row';
+
+      // 이름 입력창
+      var nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.placeholder = '이름';
+      nameInput.value = item.name;
+      nameInput.maxLength = 8;
+      nameInput.addEventListener('input', function () {
+        item.name = nameInput.value;
+        renderPersonFinalResults(previousResultValue);
+      });
+
+      // 금액 입력창 (숫자만, 콤마 자동 표시, 숫자 키패드 자동 실행)
+      var amountInput = document.createElement('input');
+      amountInput.type = 'tel';
+      amountInput.inputMode = 'numeric';
+      amountInput.placeholder = '추가 금액';
+      amountInput.value = item.amount === 0 ? '' : formatComma(item.amount);
+      amountInput.addEventListener('input', function () {
+        item.amount = extractDigits(amountInput.value); // 숫자만 허용 → 음수 입력 불가
+        amountInput.value = item.amount === 0 ? '' : formatComma(item.amount);
+        recalculate();
+      });
+
+      // 삭제 버튼
+      var removeButton = document.createElement('button');
+      removeButton.className = 'extra-remove';
+      removeButton.type = 'button';
+      removeButton.textContent = '✕';
+      removeButton.addEventListener('click', function () {
+        extraList = extraList.filter(function (i) { return i.id !== item.id; });
+        renderExtraRows();
+        recalculate();
+      });
+
+      row.appendChild(nameInput);
+      row.appendChild(amountInput);
+      row.appendChild(removeButton);
+      extraListEl.appendChild(row);
+    });
+  }
+
+  addExtraButton.addEventListener('click', function (event) {
+    createRippleEffect(addExtraButton, event);
+    if (navigator.vibrate) navigator.vibrate(8); // 햅틱 피드백(지원 기기에 한함)
+    extraList.push({ id: nextRowId++, name: '', amount: 0 });
+    renderExtraRows();
+    recalculate();
+  });
+
+  // 이름이 입력된 사람들의 "기본금액 + 추가금액" 최종 결과를 그리는 함수
+  function renderPersonFinalResults(baseSharePerPerson) {
+    var namedList = extraList.filter(function (item) { return item.name.trim() !== ''; });
+
+    if (namedList.length === 0) {
+      personFinalListEl.style.display = 'none';
+      return;
+    }
+    personFinalListEl.style.display = 'block';
+    personFinalItemsEl.innerHTML = '';
+
+    namedList.forEach(function (item) {
+      var finalAmount = baseSharePerPerson + item.amount;
+      var line = document.createElement('div');
+      line.className = 'person-final';
+      line.innerHTML =
+        '<span class="name">' + escapeHtml(item.name) + '</span>' +
+        '<span class="amount">' + formatComma(finalAmount) + '원</span>';
+      personFinalItemsEl.appendChild(line);
+    });
+  }
+
+  // 사용자가 입력한 이름에 HTML 특수문자가 있어도 안전하게 표시하기 위한 함수
+  function escapeHtml(text) {
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // ---------------------- 리플(파동) 효과 & 복사 기능 ----------------------
+
+  // 버튼을 클릭한 위치에서 동그란 파동이 퍼지는 효과를 만들어주는 함수
+  function createRippleEffect(button, event) {
+    var existingRipple = button.querySelector('.ripple');
+    if (existingRipple) existingRipple.remove();
+
+    var rect = button.getBoundingClientRect();
+    var diameter = Math.max(rect.width, rect.height);
+    var radius = diameter / 2;
+
+    var clickX = (event.clientX || (rect.left + rect.width / 2)) - rect.left;
+    var clickY = (event.clientY || (rect.top + rect.height / 2)) - rect.top;
+
+    var ripple = document.createElement('span');
+    ripple.className = 'ripple';
+    ripple.style.width = ripple.style.height = diameter + 'px';
+    ripple.style.left = (clickX - radius) + 'px';
+    ripple.style.top = (clickY - radius) + 'px';
+    button.appendChild(ripple);
+    setTimeout(function () { ripple.remove(); }, 600);
+  }
+
+  // 화면 하단에 잠깐 나타났다 사라지는 안내 메시지(토스트)
+  function showToast(message) {
+    toastEl.textContent = message;
+    toastEl.classList.add('show');
+    clearTimeout(toastEl.hideTimer);
+    toastEl.hideTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 1600);
+  }
+
+  // 클립보드 복사 공통 함수 (지원하지 않는 환경을 위한 대체 방법 포함)
+  function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        showToast('복사되었어요 📋');
+      }).catch(function () {
+        showToast('복사에 실패했어요');
+      });
+    } else {
+      // 구형 브라우저 대체 방법: 임시 textarea를 만들어 복사
+      var tempTextarea = document.createElement('textarea');
+      tempTextarea.value = text;
+      document.body.appendChild(tempTextarea);
+      tempTextarea.select();
+      try { document.execCommand('copy'); showToast('복사되었어요 📋'); }
+      catch (e) { showToast('복사에 실패했어요'); }
+      document.body.removeChild(tempTextarea);
+    }
+  }
+
+  copyButton.addEventListener('click', function (event) {
+    createRippleEffect(copyButton, event);
+    if (navigator.vibrate) navigator.vibrate(8);
+    copyToClipboard('1인당 ' + resultAmountEl.textContent + '원');
+  });
+
+  copyAllButton.addEventListener('click', function (event) {
+    createRippleEffect(copyAllButton, event);
+    if (navigator.vibrate) navigator.vibrate(8);
+
+    var lines = ['[페이쉐어 정산 결과]', '기본 1인당: ' + resultAmountEl.textContent + '원'];
+    extraList.forEach(function (item) {
+      if (item.name.trim() === '') return;
+      var finalAmount = previousResultValue + item.amount;
+      lines.push(item.name + ': ' + formatComma(finalAmount) + '원');
+    });
+    copyToClipboard(lines.join('\n'));
+  });
+
+  // 모든 알약(캡슐) 버튼에 리플 효과를 공통으로 붙여줍니다
+  document.querySelectorAll('.pill-btn').forEach(function (button) {
+    button.addEventListener('pointerdown', function (event) { createRippleEffect(button, event); });
+  });
+
+  // ---------------------- 화면 최초 진입: 순차 등장 애니메이션 ----------------------
+  window.addEventListener('DOMContentLoaded', function () {
+    var cards = document.querySelectorAll('.card');
+    cards.forEach(function (card, index) {
+      // 위에서부터 0.1초 간격으로 순차적으로 슬라이드-인 되도록 지연 시간을 부여
+      setTimeout(function () { card.classList.add('show'); }, index * 100);
+    });
+
+    setPeopleCount(1); // 초기 상태 세팅
+    recalculate();
+  });
+</script>
+
+</body>
+</html>
